@@ -6,6 +6,7 @@
 \hypersetup{pdftitle={NumPy 图像编码器实验报告},pdfauthor={}}
 \setlength{\parindent}{2em}
 \setlength{\parskip}{0.35em}
+\setlength{\emergencystretch}{2em}
 \renewcommand{\arraystretch}{1.3}
 \ctexset{section={format=\large\bfseries,beforeskip=1.0em,afterskip=0.5em}}
 \lstset{basicstyle=\ttfamily\small,breaklines=true,columns=fullflexible,
@@ -33,7 +34,7 @@
 主项目需要补全 \file{image_encoder.py} 中的六组 TODO。预处理、辅助函数和检查程序由课程附件提供。
 计算使用 NumPy，模型参数直接加载，不进行训练。各部分的实现如下。
 
-\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}p{6.1cm}X@{}}
+\noindent\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}p{6.1cm}X@{}}
 \toprule
 任务 & 实现方法 & 计算内容 \\
 \midrule
@@ -47,7 +48,7 @@
 \end{tabularx}
 
 \section{数组形状}
-\begin{tabularx}{\textwidth}{@{}l l X@{}}
+\noindent\begin{tabularx}{\textwidth}{@{}l l X@{}}
 \toprule
 阶段 & 数组形状 & 含义 \\
 \midrule
@@ -72,8 +73,10 @@ LayerNorm 的 $\epsilon=10^{-5}$，GELU 和 Softmax 使用附件提供的实现�
 transpose(0,2,4,1,3,5) -> [B,7,7,3,32,32]
 reshape(B,49,3072) -> [B,49,3072]
 \end{lstlisting}
-对于网格坐标 $g_h,g_w$，块编号为 $7g_h+g_w$。块内特征下标为 $1024c+32p_h+p_w$，
-对应原图位置 \shape{images[b,c,32*gh+ph,32*gw+pw]}。
+对于网格坐标 $g_h,g_w$，块编号为 $7g_h+g_w$。块内特征下标为 $1024c+32p_h+p_w$，对应原图位置为
+\begin{lstlisting}
+images[b, c, 32*gh+ph, 32*gw+pw]
+\end{lstlisting}
 块投影后得到 \shape{[B,49,768]}，在 token 轴前拼接 CLS，再广播相加 \shape{[50,768]} 的位置参数。
 
 多头拆分将最后一维 768 分成 12 个头，每头 64 维。
@@ -114,8 +117,11 @@ CHW 数组的连续存储顺序与空间小块的顺序不同。把网格轴拆�
 
 \newpage
 \section{数值检查}
-运行环境为 Windows、Python 3.10.8、NumPy 1.26.4、Pillow 12.3.0。
-执行 \file{python check.py --stage all} 后，assets 检查通过，
+运行环境为 Windows、Python 3.10.8、NumPy 1.26.4、Pillow 12.3.0。检查命令为
+\begin{lstlisting}
+python check.py --stage all
+\end{lstlisting}
+运行后，assets 检查通过，
 152 个参数张量及十组图片和参考数据均与附件一致。各阶段误差取自运行日志。
 
 \begin{center}
@@ -166,16 +172,14 @@ python run.py --output output_tokens.npz
 python numpy_homework.py
 python verify_submission.py --project-dir <course_project>
 \end{lstlisting}
-完整日志保存在 \file{validation.txt}，练习输出保存在 \file{numpy_homework_results.txt}。
-运行主项目时，将提交的编码器放回课程附件目录并保留其他资源。
-不同 BLAS 与 NumPy 版本可能引起轻微舍入差异，使用课程给定的容差判断即可。
+完整检查日志见 \file{validation.txt}，其他运行步骤见 README。
 
 \newpage
 \section{练习结果}
 12 道练习写在 \file{numpy_homework.py} 中，按题号排列，函数题使用题目指定的函数名。
 运行脚本可以看到给定输入的结果、数组形状和边界输入的处理。下表列出主要结果。
 
-\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}X@{}}
+\noindent\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}X@{}}
 \toprule
 题号 & 给定输入的关键结果 \\
 \midrule
@@ -190,9 +194,11 @@ E8 & batch 为 (2,3,2,2)，蓝色通道为 (2,2,2)，BHWC 为 (2,2,2,3) \\
 M1 & 批量角度为 $[0,180,90,\mathrm{nan}]$，保留原行顺序 \\
 M2 & 索引为 $[0,1,2]$，分数为 $[1,1,0]$，选中 \file{img_a}、\file{img_b}、\file{img_c} \\
 M3 & 距离矩阵约为 $\begin{bmatrix}0.608276&0.824621\\0.707107&1.486607\\0.781025&0.905539\end{bmatrix}$，最近行索引为 $[0,0,0]$ \\
+\addlinespace[0.4em]
 M4 & $Z=\begin{bmatrix}-0.91&0.66\\-0.93&0.27\end{bmatrix}$，
       $H=\begin{bmatrix}0&0.66\\0&0.27\end{bmatrix}$，
       $Y=\begin{bmatrix}-0.296&0.1432\\-0.062&-0.0596\end{bmatrix}$ \\
+\addlinespace[0.4em]
 \bottomrule
 \end{tabularx}
 
@@ -205,5 +211,6 @@ Top-k 排除零行，使用稳定排序保留同分项的顺序，并拒绝零�
 题目和运行要求来自课程附件的 \file{README.md} 与 \file{practice/project1_exercises.pdf}。
 模型参数、图片、参考输出、预处理和辅助函数均由课程提供。
 提交文件包括编码器、练习代码及运行结果、README、检查日志、本报告 PDF 和 LaTeX 源码。
-仓库地址为 \url{https://github.com/travisyu870-bot/python-project}。
+
+\noindent 仓库地址：\url{https://github.com/travisyu870-bot/python-project}
 \end{document}
