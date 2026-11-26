@@ -1,0 +1,25 @@
+Python 3.10.8 | NumPy 1.26.4 | Pillow 12.3.0
+Course source files changed: image_encoder.py
+
+COMMAND: python check.py --stage all
+assets       PASS: 152 matching visual tensors and ten image/reference pairs
+preprocess   PASS shape=(10, 3, 224, 224) max_abs=0.000e+00 mean_abs=0.000e+00 (atol=2e-06, rtol=0.0002)
+patches      PASS shape=(2, 49, 3072) max_abs=0.000e+00 mean_abs=0.000e+00 (atol=0.0002, rtol=0.0002)
+tokens       PASS shape=(2, 50, 768) max_abs=4.768e-05 mean_abs=1.291e-06 (atol=0.0002, rtol=0.0002)
+block0       PASS shape=(2, 50, 768) max_abs=5.871e-06 mean_abs=3.211e-07 (atol=0.0002, rtol=0.0002)
+last_tokens  PASS shape=(2, 50, 768) max_abs=4.673e-05 mean_abs=2.674e-06 (atol=0.0002, rtol=0.0002)
+output       PASS shape=(10, 512) max_abs=6.035e-07 mean_abs=8.129e-08 (atol=2e-05, rtol=0.0002)
+batch        PASS shape=(3, 512) max_abs=4.843e-07 mean_abs=7.496e-08 (atol=2e-05, rtol=0.0002)
+Requested numerical checks passed. The reference file is never an encoder input.
+
+COMMAND: python verify_submission.py --project-dir <course_project>
+EXERCISES PASS: analytic angles, zero vectors, input preservation, stable ties, invalid k, distances, MLP
+PATCH_ORDER PASS: direct-reshape bug reproduced (150464 wrong elements); corrected transpose matches explicit slicing
+PATCH_STRIDES PASS: non-contiguous reversed image preserves patch order
+ATTENTION PASS: head feature order, independent scalar oracle, causal mask and future-token isolation
+NEW_INPUTS PASS: generated inputs B=1/B=2, batch independence max_abs=1.639e-07, unit norms=[1.         0.99999994]
+ALL ADDITIONAL CHECKS PASSED
+
+COMMAND: python run.py --output output_tokens.npz
+RUN_OUTPUT PASS: ids match all 10 course IDs, output shape=(10, 512), max_abs=6.035e-07
+SOURCE_INTEGRITY PASS: every supplied file except image_encoder.py is byte-identical to the original ZIP

@@ -1,0 +1,209 @@
+% !TeX program = xelatex
+\documentclass[UTF8,a4paper,11pt,fontset=fandol]{ctexart}
+\usepackage[margin=2cm,top=1.8cm,bottom=1.8cm]{geometry}
+\usepackage{amsmath,amssymb,array,tabularx,booktabs,listings}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{pdftitle={NumPy 图像编码器实验报告},pdfauthor={}}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.35em}
+\renewcommand{\arraystretch}{1.3}
+\ctexset{section={format=\large\bfseries,beforeskip=1.0em,afterskip=0.5em}}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,columns=fullflexible,
+  keepspaces=true,showstringspaces=false,aboveskip=0.4em,belowskip=0.4em}
+\newcommand{\shape}[1]{\texttt{#1}}
+\newcommand{\file}[1]{\nolinkurl{#1}}
+\pagestyle{plain}
+
+\begin{document}
+\begin{center}
+  {\LARGE\bfseries NumPy 图像编码器实验报告}\par
+  \vspace{0.8em}
+  姓名：\underline{\hspace{2.5cm}}\quad
+  学号：\underline{\hspace{3cm}}\quad
+  班级：\underline{\hspace{2.5cm}}\par
+  \vspace{0.4em}
+  2026 年 11 月 26 日
+\end{center}
+
+这次作业包括 12 道 NumPy 练习和图像编码器的前向计算。编码器使用课程提供的 OpenCLIP ViT-B-32 参数，
+将每张图像转换为一个 512 维单位向量。完成代码后，课程检查的各阶段均通过，
+十张图片最终输出的最大绝对误差为 $6.035\times10^{-7}$。
+
+\section{实验任务}
+主项目需要补全 \file{image_encoder.py} 中的六组 TODO。预处理、辅助函数和检查程序由课程附件提供。
+计算使用 NumPy，模型参数直接加载，不进行训练。各部分的实现如下。
+
+\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}p{6.1cm}X@{}}
+\toprule
+任务 & 实现方法 & 计算内容 \\
+\midrule
+01 & \file{ImageEncoder.patchify} & 将图像切为 $32\times32$ 的块，并按 C、H、W 展开 \\
+02 & \file{MultiHeadAttention.split_heads} & 将特征维拆成多个头，保持 token 顺序 \\
+03 & \file{MultiHeadAttention.__call__} & 计算注意力，合并多头后投影 \\
+04 & \file{TransformerBlock.__call__} & 完成 MLP 和两次残差相加 \\
+05 & \file{ImageEncoder.embed} & 块投影，拼接 CLS，添加位置编码 \\
+06 & \file{ImageEncoder.__call__} & 提取 CLS，归一化并输出特征 \\
+\bottomrule
+\end{tabularx}
+
+\section{数组形状}
+\begin{tabularx}{\textwidth}{@{}l l X@{}}
+\toprule
+阶段 & 数组形状 & 含义 \\
+\midrule
+输入 & \shape{[B,3,224,224]} & $B$ 张 RGB 图像，通道优先 \\
+图片块 & \shape{[B,49,3072]} & $7\times7$ 个块，每块 $3\times32\times32$ 个值 \\
+输入 token & \shape{[B,50,768]} & 49 个图片 token 和 1 个 CLS token \\
+12 层之后 & \shape{[B,50,768]} & Transformer 保持序列长度与特征宽度 \\
+最终输出 & \shape{[B,512]} & 每张图像一个单位长度特征向量 \\
+\bottomrule
+\end{tabularx}
+
+普通线性层的参数按 \shape{[out,in]} 存储，因此计算使用 \file{weight.T}；块投影没有偏置。
+最终 \file{visual.proj} 已是 \shape{[768,512]} 的 \shape{[in,out]} 布局，直接相乘。
+LayerNorm 的 $\epsilon=10^{-5}$，GELU 和 Softmax 使用附件提供的实现。
+
+\newpage
+\section{主要计算}
+切块时，图片块按从左到右、从上到下的顺序排列，每个块内部按 C、H、W 顺序展开。
+因此先把高、宽拆成网格轴和块内轴，再调整轴的顺序：
+\begin{lstlisting}
+[B,3,224,224] -> [B,3,7,32,7,32]
+transpose(0,2,4,1,3,5) -> [B,7,7,3,32,32]
+reshape(B,49,3072) -> [B,49,3072]
+\end{lstlisting}
+对于网格坐标 $g_h,g_w$，块编号为 $7g_h+g_w$。块内特征下标为 $1024c+32p_h+p_w$，
+对应原图位置 \shape{images[b,c,32*gh+ph,32*gw+pw]}。
+块投影后得到 \shape{[B,49,768]}，在 token 轴前拼接 CLS，再广播相加 \shape{[50,768]} 的位置参数。
+
+多头拆分将最后一维 768 分成 12 个头，每头 64 维。
+先 reshape 为 \shape{[B,N,12,64]}，再用 \file{transpose(0,2,1,3)} 得到 \shape{[B,12,N,64]}。
+Q、K、V 来自同一次线性投影的三个切片，注意力计算为
+\[
+ S=\frac{QK^{\mathsf T}}{\sqrt{64}},\qquad
+ A=\operatorname{softmax}(S),\qquad C=AV.
+\]
+其中 $S$ 的形状为 \shape{[B,12,N,N]}，Softmax 沿最后一轴归一化。
+K 的转置只交换最后两个轴，不能使用对整个四维数组反转轴序的 \file{k.T}。
+合并头时也先交换轴，再展开特征维：
+\begin{lstlisting}
+scores = (q @ k.swapaxes(-1,-2)) / np.sqrt(np.float32(64))
+context = attention_weights(scores) @ v
+merged = context.transpose(0,2,1,3).reshape(B,N,768)
+\end{lstlisting}
+一个 Transformer 块包含两次残差相加：
+\begin{align*}
+ r &= x+\operatorname{Attention}(\operatorname{Norm}_1(x)),\\
+ u &= \operatorname{Norm}_2(r),\\
+ h &= \operatorname{GELU}(uW_1^{\mathsf T}+b_1),\\
+ y &= r+hW_2^{\mathsf T}+b_2.
+\end{align*}
+两条残差路径都保持 \shape{[B,N,768]}。
+经过全部 12 层后取 \file{tokens[:,0,:]}，对 CLS 应用 \file{post_norm}，
+乘以 \shape{[768,512]} 的输出参数，最后沿特征轴除以向量长度。
+
+\section{切块顺序检查}
+切块后即使 shape 正确，像素顺序也可能出错。为检查这一点，在 \file{verify_submission.py} 中
+对比了直接 reshape 和逐块切片两种做法。输入是从 0 开始递增、形状为 \shape{[1,3,224,224]} 的数组。
+直接 reshape 为 \shape{[B,49,3072]} 时，150528 个元素中有 150464 个位置与切片结果不同。
+
+CHW 数组的连续存储顺序与空间小块的顺序不同。把网格轴拆开、转置后再展开，
+结果与逐块切片完全一致，课程 patches 检查的最大和平均绝对误差也都为 0。
+反转图片的列后再次检查，非连续数组也能得到正确结果。
+这组对照试验复现了直接 reshape 的错误，最终代码使用调整轴序后的做法。
+
+\newpage
+\section{数值检查}
+运行环境为 Windows、Python 3.10.8、NumPy 1.26.4、Pillow 12.3.0。
+执行 \file{python check.py --stage all} 后，assets 检查通过，
+152 个参数张量及十组图片和参考数据均与附件一致。各阶段误差取自运行日志。
+
+\begin{center}
+\small
+\begin{tabular}{@{}l l r r c@{}}
+\toprule
+阶段 & shape & 最大绝对误差 & 平均绝对误差 & 结果 \\
+\midrule
+preprocess & (10,3,224,224) & 0 & 0 & PASS \\
+patches & (2,49,3072) & 0 & 0 & PASS \\
+tokens & (2,50,768) & \texttt{4.768e-05} & \texttt{1.291e-06} & PASS \\
+block0 & (2,50,768) & \texttt{5.871e-06} & \texttt{3.211e-07} & PASS \\
+last\_tokens & (2,50,768) & \texttt{4.673e-05} & \texttt{2.674e-06} & PASS \\
+output & (10,512) & \texttt{6.035e-07} & \texttt{8.129e-08} & PASS \\
+batch & (3,512) & \texttt{4.843e-07} & \texttt{7.496e-08} & PASS \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+通过条件为
+\[
+ |\mathrm{actual}-\mathrm{reference}|
+ \leq \mathrm{atol}+\mathrm{rtol}\,|\mathrm{reference}|.
+\]
+同时要求形状一致、数据类型为 float32、没有 NaN 或无穷值。
+所有阶段的 rtol 均为 $2\times10^{-4}$；预处理 atol 为 $2\times10^{-6}$，
+内部阶段为 $2\times10^{-4}$，output 和 batch 为 $2\times10^{-5}$。
+最终输出还需通过单位长度检查。
+
+参考输出只由检查程序读取，编码器本身接收输入数组和给定参数，不读取或缓存参考行。
+batch 阶段使用 $[1,0,1]$ 的图片次序，检查图片重排与重复输入后的输出对应关系。
+
+\section{补充测试与运行方法}
+补充测试用小数组逐项计算注意力，与多头注意力模块的输出对照，检查各个头的排列和因果掩码。
+开启因果掩码后，修改后面的 token，前面 token 的输出保持不变。
+测试脚本用循环写出参考计算，编码器使用 NumPy 批量运算。
+
+对两张随机生成的输入分别执行单图和双图前向，结果最大绝对差为 $1.639\times10^{-7}$，
+两行输出长度分别为 1.00000000 和 0.99999994。
+这项测试检查新输入能否运行，以及单图、批量计算是否一致；与参考模型的数值比较使用课程检查程序。
+
+\file{run.py} 成功生成 \shape{[10,512]} 输出；保存的十个 ID 与课程 ID 顺序相同，
+保存值与参考的最大绝对误差为 $6.035\times10^{-7}$。
+主项目的计算实现集中在 \file{image_encoder.py}，权重、预处理和检查标准均使用课程原文件。
+\begin{lstlisting}
+python check.py --stage all
+python run.py --output output_tokens.npz
+python numpy_homework.py
+python verify_submission.py --project-dir <course_project>
+\end{lstlisting}
+完整日志保存在 \file{validation.txt}，练习输出保存在 \file{numpy_homework_results.txt}。
+运行主项目时，将提交的编码器放回课程附件目录并保留其他资源。
+不同 BLAS 与 NumPy 版本可能引起轻微舍入差异，使用课程给定的容差判断即可。
+
+\newpage
+\section{练习结果}
+12 道练习写在 \file{numpy_homework.py} 中，按题号排列，函数题使用题目指定的函数名。
+运行脚本可以看到给定输入的结果、数组形状和边界输入的处理。下表列出主要结果。
+
+\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}X@{}}
+\toprule
+题号 & 给定输入的关键结果 \\
+\midrule
+E1 & A 的 ndim 为 2，shape 为 (3,4)，size 为 12；切片形状为 (4,) 与 (3,2)，原数组保持不变 \\
+E2 & 逐元素乘积为 $[-0.16,-0.54,0.28]$，点积为 $-0.42$；长度约为 1.220656 与 1.004988 \\
+E3 & \file{angle_deg} 返回 $45^{\circ}$ \\
+E4 & 差向量为 $[-1.3,1.6,0.9]$，欧氏距离约为 2.249444，曼哈顿距离为 3.8 \\
+E5 & 单位向量约为 $[-0.801784,0.267261,0.534522]$，长度检查通过 \\
+E6 & 列和为 $[1,-0.1,0.8]$，行均值约为 $[0.266667,0.3]$，最大值为 1.1 \\
+E7 & $Y=[[1.1,-0.1,-0.4],[-0.7,0.45,0.1]]$，shape 为 (2,3) \\
+E8 & batch 为 (2,3,2,2)，蓝色通道为 (2,2,2)，BHWC 为 (2,2,2,3) \\
+M1 & 批量角度为 $[0,180,90,\mathrm{nan}]$，保留原行顺序 \\
+M2 & 索引为 $[0,1,2]$，分数为 $[1,1,0]$，选中 \file{img_a}、\file{img_b}、\file{img_c} \\
+M3 & 距离矩阵约为 $\begin{bmatrix}0.608276&0.824621\\0.707107&1.486607\\0.781025&0.905539\end{bmatrix}$，最近行索引为 $[0,0,0]$ \\
+M4 & $Z=\begin{bmatrix}-0.91&0.66\\-0.93&0.27\end{bmatrix}$，
+      $H=\begin{bmatrix}0&0.66\\0&0.27\end{bmatrix}$，
+      $Y=\begin{bmatrix}-0.296&0.1432\\-0.062&-0.0596\end{bmatrix}$ \\
+\bottomrule
+\end{tabularx}
+
+\file{angle_deg} 和 \file{unit_vector} 遇到零向量抛出 \file{ValueError}。
+\file{angles_to} 的零数据行返回 nan，零查询抛出异常。
+Top-k 排除零行，使用稳定排序保留同分项的顺序，并拒绝零、负数、非整数、布尔值或超过有效行数的 $k$。
+批量夹角、距离矩阵和小型前向计算均未使用遍历样本的 Python 循环。
+
+\section{材料与提交文件}
+题目和运行要求来自课程附件的 \file{README.md} 与 \file{practice/project1_exercises.pdf}。
+模型参数、图片、参考输出、预处理和辅助函数均由课程提供。
+提交文件包括编码器、练习代码及运行结果、README、检查日志、本报告 PDF 和 LaTeX 源码。
+仓库地址为 \url{https://github.com/travisyu870-bot/python-project}。
+\end{document}
