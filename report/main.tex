@@ -1,40 +1,117 @@
-% !TeX program = xelatex
-\documentclass[UTF8,a4paper,11pt,fontset=fandol]{ctexart}
-\usepackage[margin=2cm,top=1.8cm,bottom=1.8cm]{geometry}
+\documentclass[a4paper,12pt]{article}
+
+\usepackage{fontspec}    % 字体支持
+\usepackage{xeCJK}       % 中文字体支持
+\IfFileExists{fonts/NotoSerifCJKsc-Regular.otf}{%
+  \setCJKmainfont{NotoSerifCJKsc-Regular.otf}[Path=fonts/,AutoFakeBold=2]%
+}{%
+  \setCJKmainfont{Noto Serif CJK SC}%
+} % 设置中文字体（Overleaf自带Noto字体）
+
+\usepackage{geometry}    % 页面边距控制
+\geometry{left=1in, right=1in, top=1in, bottom=1in}
+
+\usepackage{longtable}   % 支持长表格
+\usepackage{graphicx}    % 插入图片
+\usepackage{fancyhdr}    % 页眉页脚控制
+\usepackage{tikz}        % 绘制框线等图形
+\usetikzlibrary{calc}    % 坐标计算
+\usepackage{verbatim}    % 显示代码块
+\usepackage{float}       % 控制图片浮动位置（[H]参数）
+
+\fancyhf{} % 清空默认页眉页脚
+\fancyhead[C]{} % 中间空
+\fancyhead[R]{} % 右侧空
+
 \usepackage{amsmath,amssymb,array,tabularx,booktabs,listings}
-\usepackage[hidelinks]{hyperref}
-\hypersetup{pdftitle={NumPy 图像编码器实验报告},pdfauthor={俞亚楠}}
-\setlength{\parindent}{2em}
-\setlength{\parskip}{0.35em}
+\usepackage[hidelinks,hypertexnames=false]{hyperref}
+\hypersetup{pdftitle={NumPy图像编码器实验报告},pdfauthor={俞亚楠}}
 \setlength{\emergencystretch}{2em}
-\renewcommand{\arraystretch}{1.3}
-\ctexset{section={format=\large\bfseries,beforeskip=1.0em,afterskip=0.5em}}
+\renewcommand{\arraystretch}{1.2}
 \lstset{basicstyle=\ttfamily\small,breaklines=true,columns=fullflexible,
   keepspaces=true,showstringspaces=false,aboveskip=0.4em,belowskip=0.4em}
 \newcommand{\shape}[1]{\texttt{#1}}
 \newcommand{\file}[1]{\nolinkurl{#1}}
-\pagestyle{plain}
 
 \begin{document}
-\begin{center}
-  {\LARGE\bfseries NumPy 图像编码器实验报告}\par
-  \vspace{0.8em}
-  姓名：俞亚楠\qquad 学号：2025280566\par
-  \vspace{0.4em}
-  班级：人工智能IEEE02班\qquad 2026 年 11 月 26 日
-\end{center}
+\color{black}
 
-这次作业包括 12 道 NumPy 练习和图像编码器的前向计算。编码器使用课程提供的 OpenCLIP ViT-B-32 参数，
-将每张图像转换为一个 512 维单位向量。完成代码后，课程检查的各阶段均通过，
-十张图片最终输出的最大绝对误差为 $6.035\times10^{-7}$。
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    \Huge{\textbf{深 \ 圳 \ 大 \ 学 \ 实 \ 验  \ 报 \ 告}}\\[1.5cm]
+    
+    {\Large\textbf{课程名称}\quad\underline{\makebox[8cm][c]{Python程序设计}}}\\[0.5cm]
+{\Large
+\noindent\makebox[3.2cm][l]{\textbf{项目名称}}
+\underline{\makebox[8cm][c]{NumPy图像编码器}}}\\[0.5cm]
+{\Large
+\noindent\makebox[3.2cm][l]{\textbf{学 \quad \quad 院}}
+\underline{\makebox[8cm][c]{人工智能学院}}}\\[0.5cm]
+{\Large
+\noindent\makebox[3.2cm][l]{\textbf{专 \quad \quad 业}}
+\underline{\makebox[8cm][c]{人工智能（IEEE02班）}}}\\[0.5cm]
+{\Large
+\noindent\makebox[3.2cm][l]{\textbf{指导教师}}
+\underline{\makebox[8cm][c]{舒婷}}}\\[0.5cm]
+{\Large
+\noindent\makebox[3.2cm][l]{\textbf{报 \quad 告 \quad 人}}
+\underline{\makebox[3cm][c]{俞亚楠}}
+\hspace{0.5cm}
+\textbf{学号}
+\underline{\makebox[3cm][c]{2025280566}}}\\[0.5cm]
+{\Large
+\noindent\makebox[3.2cm][l]{\textbf{实验时间}}
+\underline{\makebox[8cm][c]{2026年11月26日}}}\\[0.5cm]
+{\Large
+\noindent\makebox[3.2cm][l]{\textbf{提交时间}}
+\underline{\makebox[8cm][c]{2026年11月28日}}}\\[1.5cm]
 
-\section{实验任务}
-主项目需要补全 \file{image_encoder.py} 中的六组 TODO。预处理、辅助函数和检查程序由课程附件提供。
-计算使用 NumPy，模型参数直接加载，不进行训练。各部分的实现如下。
+    \vfill
+    \Large{\textbf{教务处制}}
+\end{titlepage}
 
-\noindent\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}p{6.1cm}X@{}}
+\newpage
+
+\section{Objectives}
+这次实验完成12道NumPy练习和图像编码器中的六组TODO。
+练习部分使用切片、广播、向量和矩阵运算；编码器部分使用课程给定的OpenCLIP ViT-B-32参数，
+把图像转换为512维单位向量。
+实验重点是核对每一步的轴序、shape和数值，完成后用课程检查程序验证，并补充零向量、排序和批处理测试。
+
+\section{Overview}
+预处理后的输入为\shape{[B,3,224,224]}。
+每张图像分成49个$32\times32$块，投影后在前面加一个CLS token，再加位置编码，送入12层Transformer。
+最后取出CLS，经过归一化和投影得到512维向量，再除以向量长度。图~\ref{fig:vit-arch}列出了计算顺序。
+实验只做前向计算，参数不更新。
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[every node/.style={font=\small},
+    stage/.style={draw,rectangle,align=center,text width=3.8cm,minimum height=1.2cm}]
+    \node[stage] (input) at (-5,0) {RGB input\\\texttt{[B,3,224,224]}};
+    \node[stage] (patches) at (0,0) {Patchify\\\texttt{[B,49,3072]}};
+    \node[stage] (embed) at (5,0) {Projection + CLS + Position\\\texttt{[B,50,768]}};
+    \node[stage] (blocks) at (5,-2.2) {PreNorm + 12 blocks\\\texttt{[B,50,768]}};
+    \node[stage] (proj) at (0,-2.2) {CLS + PostNorm + Projection\\\texttt{[B,512]}};
+    \node[stage] (output) at (-5,-2.2) {L2 normalize\\\texttt{[B,512]}};
+    \draw[->] (input) -- (patches);
+    \draw[->] (patches) -- (embed);
+    \draw[->] (embed) -- (blocks);
+    \draw[->] (blocks) -- (proj);
+    \draw[->] (proj) -- (output);
+  \end{tikzpicture}
+  \caption{本实验OpenCLIP ViT-B-32图像编码器的前向计算流程}
+  \label{fig:vit-arch}
+\end{figure}
+
+\section{Implementations}
+\subsection{六组实现与数组布局}
+六组TODO都写在\file{image_encoder.py}中，计算使用NumPy。预处理、辅助函数和检查程序沿用课程附件。下表列出对应函数。
+
+\noindent\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}p{5.1cm}X@{}}
 \toprule
-任务 & 实现方法 & 计算内容 \\
+\textbf{任务} & \textbf{实现方法} & \textbf{计算内容} \\
 \midrule
 01 & \file{ImageEncoder.patchify} & 将图像切为 $32\times32$ 的块，并按 C、H、W 展开 \\
 02 & \file{MultiHeadAttention.split_heads} & 将特征维拆成多个头，保持 token 顺序 \\
@@ -44,11 +121,9 @@
 06 & \file{ImageEncoder.__call__} & 提取 CLS，归一化并输出特征 \\
 \bottomrule
 \end{tabularx}
-
-\section{数组形状}
 \noindent\begin{tabularx}{\textwidth}{@{}l l X@{}}
 \toprule
-阶段 & 数组形状 & 含义 \\
+\textbf{阶段} & \textbf{数组形状} & \textbf{含义} \\
 \midrule
 输入 & \shape{[B,3,224,224]} & $B$ 张 RGB 图像，通道优先 \\
 图片块 & \shape{[B,49,3072]} & $7\times7$ 个块，每块 $3\times32\times32$ 个值 \\
@@ -61,9 +136,7 @@
 普通线性层的参数按 \shape{[out,in]} 存储，因此计算使用 \file{weight.T}；块投影没有偏置。
 最终 \file{visual.proj} 已是 \shape{[768,512]} 的 \shape{[in,out]} 布局，直接相乘。
 LayerNorm 的 $\epsilon=10^{-5}$，GELU 和 Softmax 使用附件提供的实现。
-
-\newpage
-\section{主要计算}
+\subsection{切块 嵌入与Transformer计算}
 切块时，图片块按从左到右、从上到下的顺序排列，每个块内部按 C、H、W 顺序展开。
 因此先把高、宽拆成网格轴和块内轴，再调整轴的顺序：
 \begin{lstlisting}
@@ -102,19 +175,17 @@ merged = context.transpose(0,2,1,3).reshape(B,N,768)
 两条残差路径都保持 \shape{[B,N,768]}。
 经过全部 12 层后取 \file{tokens[:,0,:]}，对 CLS 应用 \file{post_norm}，
 乘以 \shape{[768,512]} 的输出参数，最后沿特征轴除以向量长度。
-
-\section{切块顺序检查}
+\subsection{切块顺序对照}
 切块后即使 shape 正确，像素顺序也可能出错。为检查这一点，在 \file{verify_submission.py} 中
 对比了直接 reshape 和逐块切片两种做法。输入是从 0 开始递增、形状为 \shape{[1,3,224,224]} 的数组。
 直接 reshape 为 \shape{[B,49,3072]} 时，150528 个元素中有 150464 个位置与切片结果不同。
 
-CHW 数组的连续存储顺序与空间小块的顺序不同。把网格轴拆开、转置后再展开，
-结果与逐块切片完全一致，课程 patches 检查的最大和平均绝对误差也都为 0。
-反转图片的列后再次检查，非连续数组也能得到正确结果。
-这组对照试验复现了直接 reshape 的错误，最终代码使用调整轴序后的做法。
+直接reshape保持原来的元素顺序，而CHW数组中相邻元素不一定属于同一个图片块。
+先拆出网格轴，转置后再展开，结果才与逐块切片一致。课程patches检查的最大和平均绝对误差均为0。
+把图像的列顺序反转后再检查，非连续数组的结果也与逐块切片一致。
 
-\newpage
-\section{数值检查}
+\section{Results}
+\subsection{课程数值检查}
 运行环境为 Windows、Python 3.10.8、NumPy 1.26.4、Pillow 12.3.0。检查命令为
 \begin{lstlisting}
 python check.py --stage all
@@ -126,7 +197,7 @@ python check.py --stage all
 \small
 \begin{tabular}{@{}l l r r c@{}}
 \toprule
-阶段 & shape & 最大绝对误差 & 平均绝对误差 & 结果 \\
+\textbf{阶段} & \textbf{shape} & \textbf{最大绝对误差} & \textbf{平均绝对误差} & \textbf{结果} \\
 \midrule
 preprocess & (10,3,224,224) & 0 & 0 & PASS \\
 patches & (2,49,3072) & 0 & 0 & PASS \\
@@ -151,15 +222,14 @@ batch & (3,512) & \texttt{4.843e-07} & \texttt{7.496e-08} & PASS \\
 
 参考输出只由检查程序读取，编码器本身接收输入数组和给定参数，不读取或缓存参考行。
 batch 阶段使用 $[1,0,1]$ 的图片次序，检查图片重排与重复输入后的输出对应关系。
-
-\section{补充测试与运行方法}
+\subsection{补充检查与运行方法}
 补充测试用小数组逐项计算注意力，与多头注意力模块的输出对照，检查各个头的排列和因果掩码。
 开启因果掩码后，修改后面的 token，前面 token 的输出保持不变。
 测试脚本用循环写出参考计算，编码器使用 NumPy 批量运算。
 
 对两张随机生成的输入分别执行单图和双图前向，结果最大绝对差为 $1.639\times10^{-7}$，
 两行输出长度分别为 1.00000000 和 0.99999994。
-这项测试检查新输入能否运行，以及单图、批量计算是否一致；与参考模型的数值比较使用课程检查程序。
+这项测试用来比较单图和批量计算结果；与参考输出的误差仍以课程检查为准。
 
 \file{run.py} 成功生成 \shape{[10,512]} 输出；保存的十个 ID 与课程 ID 顺序相同，
 保存值与参考的最大绝对误差为 $6.035\times10^{-7}$。
@@ -171,15 +241,13 @@ python numpy_homework.py
 python verify_submission.py --project-dir <course_project>
 \end{lstlisting}
 完整检查日志见 \file{validation.txt}，其他运行步骤见 README。
-
-\newpage
-\section{练习结果}
+\subsection{十二道NumPy练习结果}
 12 道练习写在 \file{numpy_homework.py} 中，按题号排列，函数题使用题目指定的函数名。
-运行脚本可以看到给定输入的结果、数组形状和边界输入的处理。下表列出主要结果。
+下表记录题目给定输入的运行结果，完整输出保存在\file{numpy_homework_results.txt}。
 
 \noindent\begin{tabularx}{\textwidth}{@{}c>{\raggedright\arraybackslash}X@{}}
 \toprule
-题号 & 给定输入的关键结果 \\
+\textbf{题号} & \textbf{给定输入的关键结果} \\
 \midrule
 E1 & A 的 ndim 为 2，shape 为 (3,4)，size 为 12；切片形状为 (4,) 与 (3,2)，原数组保持不变 \\
 E2 & 逐元素乘积为 $[-0.16,-0.54,0.28]$，点积为 $-0.42$；长度约为 1.220656 与 1.004988 \\
@@ -205,10 +273,86 @@ M4 & $Z=\begin{bmatrix}-0.91&0.66\\-0.93&0.27\end{bmatrix}$，
 Top-k 排除零行，使用稳定排序保留同分项的顺序，并拒绝零、负数、非整数、布尔值或超过有效行数的 $k$。
 批量夹角、距离矩阵和小型前向计算均未使用遍历样本的 Python 循环。
 
-\section{材料与提交文件}
-题目和运行要求来自课程附件的 \file{README.md} 与 \file{practice/project1_exercises.pdf}。
-模型参数、图片、参考输出、预处理和辅助函数均由课程提供。
-提交文件包括编码器、练习代码及运行结果、README、检查日志、本报告 PDF 和 LaTeX 源码。
+\clearpage
+\section{Discussion}
+\subsection{切块和轴序}
+切块是这次实验中需要仔细核对的一步。直接reshape和正确切块的shape都可以是
+\shape{[B,49,3072]}，但递增数组的对照中有150464个元素位置不同。
+因此，除了检查shape，还要用逐块切片核对元素顺序。
+多头注意力也有类似问题：拆分后是\shape{[B,12,N,64]}，合并时先把头轴和token轴换回来，再展开特征维。
 
-\noindent 仓库地址：\url{https://github.com/travisyu870-bot/python-project}
+权重方向也需要分别检查。普通线性层参数为\shape{[out,in]}，计算时使用\file{weight.T}；
+最终\file{visual.proj}为\shape{[768,512]}，可以直接相乘。
+两次残差相加前后的shape均为\shape{[B,N,768]}。
+把这些位置分开检查，比只比较最终输出更容易定位问题。
+
+\subsection{检查结果与后续改进}
+课程各阶段检查均通过，最终输出的最大绝对误差为$6.035\times10^{-7}$。
+新输入的单图与批量结果最大绝对差为$1.639\times10^{-7}$，输出向量长度接近1。
+这些结果支持当前实现通过了本次检查，但不能代替其他输入和运行环境下的测试。
+
+本次没有记录耗时和峰值内存，后续可以在相同输入下分别测量单图和批处理。
+当前每张图像有50个token，注意力矩阵的后两维为\shape{[50,50]}；
+若增加token数，还需要检查内存占用。
+
+\subsection{实验材料}
+题目和运行要求来自课程附件\file{README.md}与\file{practice/project1_exercises.pdf}。
+权重、图片、预处理、辅助函数和参考输出均由课程提供。
+代码与运行记录分别保存在\file{image_encoder.py}、\file{numpy_homework.py}、
+\file{numpy_homework_results.txt}和\file{validation.txt}中。
+
+\noindent 代码仓库：\url{https://github.com/travisyu870-bot/python-project}
+
+\newpage
+
+\begin{tikzpicture}[remember picture, overlay]
+  \draw[thick] 
+    ($(current page.north west)+(2cm,-3cm)$) 
+    rectangle 
+    ($(current page.south east)+(-2cm,3.5cm)$);
+\end{tikzpicture}
+
+\vspace{1cm}
+
+\noindent \textbf{指导教师批阅意见：}
+\vspace{6cm}
+\hfill
+
+\vspace{1cm}
+
+\noindent \textbf{成绩评定：}
+\vspace{2cm}
+\hfill
+
+\vspace{1cm}
+
+\noindent
+\hfill
+\textbf{指导教师签字：}\quad\quad\quad\quad\quad\\[0.5cm]
+
+\hfill
+\textbf{年}\quad\quad
+\textbf{月}\quad\quad
+\textbf{日}\quad
+
+\vspace{1cm}
+
+\noindent \textbf{备注：}
+
+\begin{tikzpicture}[remember picture, overlay]
+  \node[
+    anchor=north west,
+    inner sep=0pt,
+    text width=\dimexpr\paperwidth-4cm\relax
+  ] at ($(current page.south west)+(2cm,3.1cm)$) {
+    \begin{minipage}{\dimexpr\paperwidth-4cm\relax}
+      \small
+      \noindent
+      \textbf{注：}\;1、报告内的项目或内容设置，可根据实际情况加以调整和补充。\\[0.2cm]
+      \phantom{\textbf{注：}\;}2、教师批改学生实验报告时间应在学生提交实验报告时间后 10 日内。
+    \end{minipage}
+  };
+\end{tikzpicture}
+
 \end{document}
+

@@ -83,4 +83,4 @@ python verify_submission.py --project-dir "C:\path\to\project1-numpy-student"
 
 ## 编译报告
 
-报告使用 LaTeX 编写，全部采用黑字白底。将 `report/` 中的文件上传至 Overleaf，选择 XeLaTeX 编译器，以 `main.tex` 为主文件。填写姓名、学号和班级后重新编译，下载 PDF 提交。
+报告使用课程提供的深圳大学实验报告 LaTeX 模板，保留独立封面、五个指定章节和教师批阅页，全部采用黑字白底。将 report/ 中的文件上传至 Overleaf，选择 XeLaTeX 编译器，以 main.tex 为主文件。姓名、学号、班级及日期已填写，编译后下载 PDF 提交。
